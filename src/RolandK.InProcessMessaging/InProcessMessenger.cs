@@ -12,7 +12,7 @@ namespace RolandK.InProcessMessaging;
 
 /// <summary>
 /// Main class for sending/receiving messages.
-/// This class follows the Messenger pattern but modifies it on some parts like thread synchronization.
+/// This class follows the Messenger pattern but modifies it on some parts like thread synchronization and routing between more messengers.
 /// What 'messenger' actually is, see here a short explanation:
 /// http://stackoverflow.com/questions/22747954/mvvm-light-toolkit-messenger-uses-event-aggregator-or-mediator-pattern
 /// </summary>
@@ -59,9 +59,9 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
     }
 
     /// <summary>
-    /// Gets the name of the associated thread.
+    /// Gets the name of this messenger.
     /// </summary>
-    public string MainThreadName
+    public string MessengerName
     {
         get
         {
@@ -88,6 +88,10 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
         }
     }
 
+    /// <summary>
+    /// Custom compare function for <see cref="SynchronizationContext"/>
+    /// This was implemented for WPF, because there the SynchronizationContext object differs
+    /// </summary>
     public Func<SynchronizationContext, SynchronizationContext, bool>? CustomSynchronizationContextEqualityChecker { get; set; }
 
     /// <summary>
@@ -221,6 +225,7 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
         subscription = this.Subscribe<T>((message) =>
         {
             // Unsubscribe first
+            // ReSharper disable once AccessToModifiedClosure
             subscription!.Unsubscribe();
 
             // Set the task's result
@@ -252,7 +257,7 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
                 ParameterInfo[] parameters = actMethod.GetParameters();
                 if (parameters.Length != 1) { continue; }
 
-                if (!InProcessMessageHelper.ValidateMessageType(parameters[0].ParameterType, out _))
+                if (!InProcessMessageMetadataHelper.ValidateMessageType(parameters[0].ParameterType, out _))
                 {
                     continue;
                 }
@@ -300,7 +305,7 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
         actionOnMessage.EnsureNotNull(nameof(actionOnMessage));
         messageType.EnsureNotNull(nameof(messageType));
 
-        InProcessMessageHelper.EnsureValidMessageType(messageType);
+        InProcessMessageMetadataHelper.EnsureValidMessageType(messageType);
 
         MessageSubscription newOne = new(this, messageType, actionOnMessage);
         lock (_messageSubscriptionsLock)
@@ -447,12 +452,12 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
     private void PublishInternal<TMessageType>(
         TMessageType message, bool isInitialCall)
     {
-        InProcessMessageHelper.EnsureValidMessageTypeAndValue(message);
+        InProcessMessageMetadataHelper.EnsureValidMessageTypeAndValue(message);
 
         try
         {
             // Check whether publish is possible
-            if(_publishCheckBehavior == InProcessMessengerThreadingBehavior.EnsureMainSyncContextOnSyncCalls)
+            if(_publishCheckBehavior == InProcessMessengerThreadingBehavior.EnsureCorrectSyncContextOnSyncCalls)
             {
                 if (!this.CompareSynchronizationContexts())
                 {
@@ -467,7 +472,9 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
             Type currentType = typeof(TMessageType);
             if (isInitialCall)
             {
-                string[] possibleSources = s_messageSources.GetOrAdd(currentType, (_) => InProcessMessageHelper.GetPossibleSourceMessengersOfMessageType(currentType));
+                string[] possibleSources = s_messageSources.GetOrAdd(
+                    currentType, 
+                    _ => InProcessMessageMetadataHelper.GetPossibleSourceMessengersOfMessageType(currentType));
                 if (possibleSources.Length > 0)
                 {
                     string mainThreadName = _globalMessengerName;
@@ -513,19 +520,19 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
             if (isInitialCall)
             {
                 // Get information about message routing
-                var asyncTargets = s_messagesAsyncTargets.GetOrAdd(currentType, (_) => InProcessMessageHelper.GetAsyncRoutingTargetMessengersOfMessageType(currentType));
-                var mainThreadName = _globalMessengerName;
+                var asyncTargets = s_messagesAsyncTargets.GetOrAdd(currentType, (_) => InProcessMessageMetadataHelper.GetAsyncRoutingTargetMessengersOfMessageType(currentType));
+                var mainMessengerName = _globalMessengerName;
                 for (var loop = 0; loop < asyncTargets.Length; loop++)
                 {
                     var actAsyncTargetName = asyncTargets[loop];
-                    if (mainThreadName == actAsyncTargetName) { continue; }
+                    if (mainMessengerName == actAsyncTargetName) { continue; }
 
                     if (s_messengersByName.TryGetValue(actAsyncTargetName, out var actAsyncTargetHandler))
                     {
                         var actSyncContext = actAsyncTargetHandler!._hostSyncContext;
                         if (actSyncContext == null) { continue; }
 
-                        var innerHandlerForAsyncCall = actAsyncTargetHandler!;
+                        var innerHandlerForAsyncCall = actAsyncTargetHandler;
                         actSyncContext.PostAlsoIfNull(() =>
                         {
                             innerHandlerForAsyncCall.PublishInternal(message, false);

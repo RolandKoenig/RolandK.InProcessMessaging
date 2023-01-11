@@ -11,7 +11,7 @@ namespace RolandK.InProcessMessaging.Checking;
 /// to check method parameters.
 /// Note: All methods are only executing in DebugBuilds.
 /// </summary>
-public static partial class Ensure
+internal static class Ensure
 {
     public static void EnsureEqual(
         this object toCompare, object other, string checkedVariableName,

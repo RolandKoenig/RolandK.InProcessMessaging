@@ -4,7 +4,7 @@ using RolandK.InProcessMessaging.Exceptions;
 
 namespace RolandK.InProcessMessaging;
 
-internal static class InProcessMessageHelper
+public static class InProcessMessageMetadataHelper
 {
     public static bool ValidateMessageTypeAndValue<T>(T messageValue, out string? errorMessage)
     {
@@ -32,7 +32,7 @@ internal static class InProcessMessageHelper
         if (messageType.GetCustomAttribute<InProcessMessageAttribute>() == null)
         {
             errorMessage =
-                $"Invalid message type {messageType.FullName}: Message types have to be market with FirLibMessageAttribute!";
+                $"Invalid message type {messageType.FullName}: Message types have to be market with InProcessMessageAttribute!";
             return false;
         }
         return true;

@@ -11,8 +11,8 @@ public enum InProcessMessengerThreadingBehavior
     Ignore,
 
     /// <summary>
-    /// Ensures that the main SynchronizationContext is set when 
-    /// this Messenger is used on synchronous calls.
+    /// Ensures that the correct SynchronizationContext is set when 
+    /// this Messenger is used for synchronous calls.
     /// </summary>
-    EnsureMainSyncContextOnSyncCalls
+    EnsureCorrectSyncContextOnSyncCalls
 }
