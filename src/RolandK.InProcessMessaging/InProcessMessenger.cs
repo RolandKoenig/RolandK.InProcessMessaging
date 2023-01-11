@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -63,10 +64,12 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
     /// </summary>
     public string MessengerName
     {
-        get
-        {
-            return _globalMessengerName;
-        }
+        get { return _globalMessengerName; }
+    }
+
+    public bool IsConnectedToGlobalMessaging
+    {
+        get => !string.IsNullOrEmpty(_globalMessengerName);
     }
 
     /// <summary>
@@ -176,6 +179,18 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
         if (!string.IsNullOrEmpty(messengerName))
         {
             s_messengersByName.TryAdd(messengerName, this);
+        }
+    }
+
+    /// <summary>
+    /// Disconnects all <see cref="InProcessMessenger"/> from global messaging.
+    /// </summary>
+    public static void DisconnectGlobalMessagingConnections()
+    {
+        var allGlobalMessengers = s_messengersByName.Values.ToArray();
+        foreach (var actMessenger in allGlobalMessengers)
+        {
+            actMessenger.DisconnectFromGlobalMessaging();
         }
     }
 

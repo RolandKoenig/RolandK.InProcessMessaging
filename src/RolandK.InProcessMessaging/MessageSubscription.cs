@@ -34,13 +34,13 @@ public class MessageSubscription : IDisposable
     /// <summary>
     /// Gets the name of the message type.
     /// </summary>
-    public string MessageTypeName => _messageType?.FullName ?? throw new ObjectDisposedException(nameof(MessageSubscription));
+    public string MessageTypeName => _messageType?.Name ?? throw new ObjectDisposedException(nameof(MessageSubscription));
 
     /// <summary>
     /// Gets the name of the target object.
     /// </summary>
-    public string TargetObjectName => 
-        _targetHandler?.Target?.ToString() ??
+    public object TargetObject => 
+        _targetHandler?.Target ??
         throw new ObjectDisposedException(nameof(MessageSubscription));
 
     /// <summary>

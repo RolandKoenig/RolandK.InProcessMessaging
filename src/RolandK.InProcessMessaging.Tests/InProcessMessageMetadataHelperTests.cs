@@ -1,5 +1,6 @@
 ﻿namespace RolandK.InProcessMessaging.Tests;
 
+[Collection(TestConstants.SINGLE_TEST_COLLECTION_NAME)]
 public class InProcessMessageMetadataHelperTests
 {
     [Fact]
