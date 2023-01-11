@@ -10,7 +10,7 @@ A messenger implementation which sends / receives in process messages. It is abl
 [![Continuous integration](https://github.com/RolandKoenig/RolandK.InProcessMessaging/actions/workflows/continuous-integration.yml/badge.svg)](https://github.com/RolandKoenig/RolandK.InProcessMessaging/actions/workflows/continuous-integration.yml)
 
 ## Nuget
-| Package                    | Link                                               |
-|----------------------------|----------------------------------------------------|
-| RolandK.InProcessMessaging |                                                    |
+| Package                    | Link                                                      |
+|----------------------------|-----------------------------------------------------------|
+| RolandK.InProcessMessaging | https://www.nuget.org/packages/RolandK.InProcessMessaging |
 
