@@ -40,7 +40,7 @@
         <LangVersion>10.0</LangVersion>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <WarningsAsErrors />
-        <NoWarn>1701,1702,1591</NoWarn>
+        <NoWarn>1591,1712</NoWarn>
     </PropertyGroup>
 
 </Project>
