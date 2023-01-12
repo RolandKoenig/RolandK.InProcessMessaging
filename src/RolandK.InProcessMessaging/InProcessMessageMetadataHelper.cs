@@ -32,7 +32,7 @@ public static class InProcessMessageMetadataHelper
         if (messageType.GetCustomAttribute<InProcessMessageAttribute>() == null)
         {
             errorMessage =
-                $"Invalid message type {messageType.FullName}: Message types have to be market with InProcessMessageAttribute!";
+                $"Invalid message type {messageType.FullName}: Message types have to be marked with InProcessMessageAttribute!";
             return false;
         }
         return true;
@@ -70,7 +70,7 @@ public static class InProcessMessageMetadataHelper
     }
 
     /// <summary>
-    /// Gets a list containing all possible source messengers of this message.
+    /// Gets a list containing all possible source messengers for the given message type.
     /// An empty list means that every messenger can fire this message
     /// </summary>
     /// <param name="messageType">The type of the message.</param>

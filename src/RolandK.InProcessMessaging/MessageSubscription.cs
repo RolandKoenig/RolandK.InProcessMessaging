@@ -3,8 +3,8 @@
 namespace RolandK.InProcessMessaging;
 
 /// <summary>
-/// This class holds all information about message subscriptions. It implements IDisposable for unsubscribing
-/// from the message.
+/// This class holds all information about a message subscriptions. It implements IDisposable for unsubscribing
+/// from the <see cref="InProcessMessenger"/>.
 /// </summary>
 public class MessageSubscription : IDisposable
 {

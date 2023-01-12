@@ -5,7 +5,7 @@ using System.Diagnostics;
 namespace RolandK.InProcessMessaging.Exceptions;
 
 /// <summary>
-/// An exception info holding all information about exceptions occurred during publishing a message.
+/// An exception holding all information about exceptions occurred during publishing a message.
 /// </summary>
 public class MessagePublishException : Exception
 {
@@ -29,11 +29,11 @@ public class MessagePublishException : Exception
     public MessagePublishException(Type messageType, string message)
         : base("Exceptions where raised while processing message of type " + messageType.FullName + ": " + message)
     {
-        MessageType = messageType;
-        PublishExceptions = new List<Exception>();
+        this.MessageType = messageType;
+        this.PublishExceptions = new List<Exception>();
 
         // Acquire true stacktrace information
-        TrueStackTrace = new StackTrace().ToString();
+        this.TrueStackTrace = new StackTrace().ToString();
     }
 
     /// <summary>
@@ -44,10 +44,10 @@ public class MessagePublishException : Exception
     public MessagePublishException(Type messageType, List<Exception> publishExceptions)
         : base("Exceptions where raised while processing message of type " + messageType.FullName + "!")
     {
-        MessageType = messageType;
-        PublishExceptions = publishExceptions;
+        this.MessageType = messageType;
+        this.PublishExceptions = publishExceptions;
 
         // Acquire true stacktrace information
-        TrueStackTrace = new StackTrace().ToString();
+        this.TrueStackTrace = new StackTrace().ToString();
     }
 }

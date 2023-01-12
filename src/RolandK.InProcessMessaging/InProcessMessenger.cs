@@ -44,7 +44,7 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
     private object _messageSubscriptionsLock;
 
     /// <summary>
-    /// Gets or sets the synchronization context on which to publish all messages.
+    /// Gets the synchronization context on which to publish all messages.
     /// </summary>
     public SynchronizationContext? HostSyncContext
     {
@@ -154,7 +154,9 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
     }
 
     /// <summary>
-    /// Sets all required synchronization properties.
+    /// Connects this messenger to global messaging.
+    /// This is needed for routing published messages from other messengers to this one and also from this
+    /// one to others.
     /// </summary>
     /// <param name="checkBehavior">Defines the checking behavior for publish calls.</param>
     /// <param name="messengerName">The name by which this messenger should be registered.</param>
@@ -185,7 +187,7 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
     /// <summary>
     /// Disconnects all <see cref="InProcessMessenger"/> from global messaging.
     /// </summary>
-    public static void DisconnectGlobalMessagingConnections()
+    public static void DisconnectAllGlobalMessagingConnections()
     {
         var allGlobalMessengers = s_messengersByName.Values.ToArray();
         foreach (var actMessenger in allGlobalMessengers)
@@ -252,24 +254,25 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
 
     /// <summary>
     /// Subscribes all receiver-methods of the given target object to this Messenger.
-    /// The messages have to be called OnMessageReceived.
+    /// The methods have to be called OnMessageReceived.
+    /// Example: void OnMessageReceived(TMessageType message)
     /// </summary>
     /// <param name="targetObject">The target object which is to subscribe.</param>
     public IEnumerable<MessageSubscription> SubscribeAll(object targetObject)
     {
         targetObject.EnsureNotNull(nameof(targetObject));
 
-        Type targetObjectType = targetObject.GetType();
-        List<MessageSubscription> generatedSubscriptions = new(16);
+        var targetObjectType = targetObject.GetType();
+        var generatedSubscriptions = new List<MessageSubscription>(16);
         try
         {
-            foreach (MethodInfo actMethod in targetObjectType.GetMethods(
+            foreach (var actMethod in targetObjectType.GetMethods(
                          BindingFlags.NonPublic | BindingFlags.Public | 
                          BindingFlags.Instance | BindingFlags.InvokeMethod))
             {
                 if (!actMethod.Name.Equals(METHOD_NAME_MESSAGE_RECEIVED)) { continue; }
 
-                ParameterInfo[] parameters = actMethod.GetParameters();
+                var parameters = actMethod.GetParameters();
                 if (parameters.Length != 1) { continue; }
 
                 if (!InProcessMessageMetadataHelper.ValidateMessageType(parameters[0].ParameterType, out _))
@@ -277,8 +280,8 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
                     continue;
                 }
 
-                Type genericAction = typeof(Action<>);
-                Type delegateType = genericAction.MakeGenericType(parameters[0].ParameterType);
+                var genericAction = typeof(Action<>);
+                var delegateType = genericAction.MakeGenericType(parameters[0].ParameterType);
                 generatedSubscriptions.Add(this.Subscribe(
                     actMethod.CreateDelegate(delegateType, targetObject),
                     parameters[0].ParameterType));
@@ -286,7 +289,7 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
         }
         catch(Exception)
         {
-            foreach(MessageSubscription actSubscription in generatedSubscriptions)
+            foreach(var actSubscription in generatedSubscriptions)
             {
                 actSubscription.Unsubscribe();
             }
@@ -305,7 +308,7 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
     {
         actionOnMessage.EnsureNotNull(nameof(actionOnMessage));
 
-        Type currentType = typeof(TMessageType);
+        var currentType = typeof(TMessageType);
         return this.Subscribe(actionOnMessage, currentType);
     }
 
@@ -322,7 +325,7 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
 
         InProcessMessageMetadataHelper.EnsureValidMessageType(messageType);
 
-        MessageSubscription newOne = new(this, messageType, actionOnMessage);
+        var newOne = new MessageSubscription(this, messageType, actionOnMessage);
         lock (_messageSubscriptionsLock)
         {
             if (_messageSubscriptions.ContainsKey(messageType))
@@ -350,14 +353,14 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
 
         if (!messageSubscription.IsDisposed)
         {
-            Type messageType = messageSubscription.MessageType;
+            var messageType = messageSubscription.MessageType;
 
             // Remove subscription from internal list
             lock (_messageSubscriptionsLock)
             {
                 if (_messageSubscriptions.ContainsKey(messageType))
                 {
-                    List<MessageSubscription> listOfSubscriptions = _messageSubscriptions[messageType];
+                    var listOfSubscriptions = _messageSubscriptions[messageType];
                     listOfSubscriptions.Remove(messageSubscription);
                     if (listOfSubscriptions.Count == 0)
                     {
@@ -484,15 +487,15 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
             }
 
             // Check for correct message sources
-            Type currentType = typeof(TMessageType);
+            var currentType = typeof(TMessageType);
             if (isInitialCall)
             {
-                string[] possibleSources = s_messageSources.GetOrAdd(
+                var possibleSources = s_messageSources.GetOrAdd(
                     currentType, 
                     _ => InProcessMessageMetadataHelper.GetPossibleSourceMessengersOfMessageType(currentType));
                 if (possibleSources.Length > 0)
                 {
-                    string mainThreadName = _globalMessengerName;
+                    var mainThreadName = _globalMessengerName;
                     if (string.IsNullOrEmpty(mainThreadName) ||
                         (Array.IndexOf(possibleSources, mainThreadName) < 0))
                     {
@@ -506,7 +509,7 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
             }
 
             // Perform synchronous message handling
-            List<MessageSubscription> subscriptionsToTrigger = new(20);
+            var subscriptionsToTrigger = new List<MessageSubscription>(20);
             lock (_messageSubscriptionsLock)
             {
                 if (_messageSubscriptions.ContainsKey(currentType))

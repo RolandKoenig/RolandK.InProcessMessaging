@@ -9,7 +9,6 @@ namespace RolandK.InProcessMessaging.Checking;
 /// <summary>
 /// This class contains some helper methods which can be used
 /// to check method parameters.
-/// Note: All methods are only executing in DebugBuilds.
 /// </summary>
 internal static class Ensure
 {

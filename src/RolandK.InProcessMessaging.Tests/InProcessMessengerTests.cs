@@ -85,7 +85,7 @@ public class InProcessMessengerTests
         }
         finally
         {
-            InProcessMessenger.DisconnectGlobalMessagingConnections();
+            InProcessMessenger.DisconnectAllGlobalMessagingConnections();
         }
     }
     
@@ -109,7 +109,7 @@ public class InProcessMessengerTests
         }
         finally
         {
-            InProcessMessenger.DisconnectGlobalMessagingConnections();
+            InProcessMessenger.DisconnectAllGlobalMessagingConnections();
         }
     }
     
