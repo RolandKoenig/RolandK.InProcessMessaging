@@ -14,3 +14,30 @@ A messenger implementation which sends / receives in process messages. It is abl
 |----------------------------|-----------------------------------------------------------|
 | RolandK.InProcessMessaging | https://www.nuget.org/packages/RolandK.InProcessMessaging |
 
+## Samples
+### Publish / Subscribe
+Messages can be defined as class, struct or record. They are marked with an InProcessMessage attribute.
+```csharp
+[InProcessMessage]
+private record DummyMessage;
+```
+
+Given we've created an InProcessMessenger before, we can easily subscribe to messages. The subscription gets called
+each time the message gets published. You can unsubscribe later by calling Dispose or Unsubscribe on the
+MessageSubscription object.
+```csharp
+var messenger = new InProcessMessenger();
+
+//...
+
+var subscription = messenger.Subscribe<DummyMessage>(dummyMessage => 
+{
+    // Logic
+});
+```
+
+Now we can publish a message to notify all subscribers of that message type.
+```csharp
+messenger.Publish(new DummyMessage());
+```
+`
