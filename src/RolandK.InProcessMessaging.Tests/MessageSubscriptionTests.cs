@@ -60,6 +60,25 @@ public class MessageSubscriptionTests
         Assert.Equal(subscribedAction.Method.Name, subscription.TargetMethodName);
     }
     
+    [Fact]
+    public void SubscribeWeakToMessenger()
+    {
+        // Arrange
+        var messenger = new InProcessMessenger();
+        
+        // Act
+        var subscribedAction = (DummyMessage message) => { };
+        using var subscription = messenger.SubscribeWeak(subscribedAction);
+        
+        // Assert
+        Assert.Equal(messenger, subscription.Messenger);
+        Assert.False(subscription.IsDisposed);
+        Assert.Equal(typeof(DummyMessage), subscription.MessageType);
+        Assert.Equal(nameof(DummyMessage), subscription.MessageTypeName);
+        Assert.Equal(subscribedAction.Target, subscription.TargetObject);
+        Assert.Equal(subscribedAction.Method.Name, subscription.TargetMethodName);
+    }
+    
     //*************************************************************************
     //*************************************************************************
     //*************************************************************************

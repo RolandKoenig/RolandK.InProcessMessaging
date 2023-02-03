@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 
 namespace RolandK.InProcessMessaging;
 
@@ -6,20 +7,25 @@ namespace RolandK.InProcessMessaging;
 /// This class holds all information about a message subscriptions. It implements IDisposable for unsubscribing
 /// from the <see cref="InProcessMessenger"/>.
 /// </summary>
-public class MessageSubscription : IDisposable
+public sealed class MessageSubscription : IDisposable
 {
     // Main members for publishing
     private InProcessMessenger? _messenger;
     private Type? _messageType;
+    
+    // Members for normal reference to target
     private Delegate? _targetHandler;
+
+    // Members for weak reference to target
+    private WeakReference? _weakTargetObject;
+    private MethodInfo? _weakTargetMethod;
 
     /// <summary>
     /// Is this subscription valid?
     /// </summary>
     public bool IsDisposed =>
         (_messenger == null) ||
-        (_messageType == null) ||
-        (_targetHandler == null);
+        (_messageType == null);
 
     /// <summary>
     /// Gets the corresponding Messenger object.
@@ -39,26 +45,66 @@ public class MessageSubscription : IDisposable
     /// <summary>
     /// Gets the name of the target object.
     /// </summary>
-    public object TargetObject => 
-        _targetHandler?.Target ??
-        throw new ObjectDisposedException(nameof(MessageSubscription));
+    public object TargetObject
+    {
+        get
+        {
+            if (_targetHandler != null) { return _targetHandler.Target; }
+
+            var weakTarget = _weakTargetObject?.Target;
+            if (weakTarget != null) { return weakTarget; }
+
+            throw new ObjectDisposedException(nameof(MessageSubscription));
+        }
+    }
 
     /// <summary>
     /// Gets the name of the target method.
     /// </summary>
-    public string TargetMethodName => _targetHandler?.Method.Name ?? throw new ObjectDisposedException(nameof(MessageSubscription));
+    public string TargetMethodName
+    {
+        get
+        {
+            if (_targetHandler != null) { return _targetHandler.Method.Name; }
+
+            if (_weakTargetMethod != null) { return _weakTargetMethod.Name; }
+            
+            throw new ObjectDisposedException(nameof(MessageSubscription));
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MessageSubscription"/> class.
+    /// This subscription keeps the target object alive.
     /// </summary>
     /// <param name="messenger">The messenger.</param>
     /// <param name="messageType">Type of the message.</param>
     /// <param name="targetHandler">The target handler.</param>
-    internal MessageSubscription(InProcessMessenger messenger, Type messageType, Delegate targetHandler)
+    internal MessageSubscription(
+        InProcessMessenger messenger, Type messageType, 
+        Delegate targetHandler)
     {
         _messenger = messenger;
         _messageType = messageType;
         _targetHandler = targetHandler;
+    }
+    
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MessageSubscription"/> class.
+    /// This subscription does not keep the target object alive.
+    /// </summary>
+    /// <param name="messenger">The messenger.</param>
+    /// <param name="messageType">Type of the message.</param>
+    /// <param name="weakTargetObject">A <see cref="WeakReference"/> to the target object.</param>
+    /// <param name="weakTargetMethod">The method to call on the target object.</param>
+    internal MessageSubscription(
+        InProcessMessenger messenger, Type messageType, 
+        WeakReference weakTargetObject, MethodInfo weakTargetMethod)
+    {
+        _messenger = messenger;
+        _messageType = messageType;
+        _weakTargetObject = weakTargetObject;
+        _weakTargetMethod = weakTargetMethod;
     }
 
     /// <summary>
@@ -79,8 +125,23 @@ public class MessageSubscription : IDisposable
         // Call this subscription
         if (!this.IsDisposed)
         {
-            var targetDelegate = _targetHandler as Action<TMessageType>;
-            targetDelegate!.Invoke(message);
+            if (_targetHandler != null)
+            {
+                _targetHandler.DynamicInvoke(message!);
+            }
+            else if ((_weakTargetObject != null) &&
+                     (_weakTargetMethod != null))
+            {
+                var targetObject = _weakTargetObject.Target;
+                if (targetObject == null)
+                {
+                    _weakTargetMethod.Invoke(_weakTargetObject, new object[] { message! });
+                }
+                else
+                {
+                    this.Dispose();
+                }
+            }
         }
     }
 
@@ -92,6 +153,8 @@ public class MessageSubscription : IDisposable
         _messenger = null;
         _messageType = null;
         _targetHandler = null;
+        _weakTargetMethod = null;
+        _weakTargetObject = null;
     }
 
     /// <summary>
