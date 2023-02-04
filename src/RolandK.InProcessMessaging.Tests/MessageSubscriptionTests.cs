@@ -61,6 +61,40 @@ public class MessageSubscriptionTests
     }
     
     [Fact]
+    public void Subscribe_and_Unsubscribe()
+    {
+        // Arrange
+        var messenger = new InProcessMessenger();
+        
+        // Act
+        var subscribedAction = (DummyMessage message) => { };
+        using var subscription = messenger.Subscribe(subscribedAction);
+        subscription.Unsubscribe();
+        
+        // Assert
+        Assert.True(subscription.IsDisposed);
+        Assert.Equal(0, messenger.CountSubscriptionsForMessage<DummyMessage>());
+    }
+    
+    [Fact]
+    public void Subscribe_and_Unsubscribe_multiple_times()
+    {
+        // Arrange
+        var messenger = new InProcessMessenger();
+        
+        // Act
+        var subscribedAction = (DummyMessage message) => { };
+        using var subscription = messenger.Subscribe(subscribedAction);
+        subscription.Unsubscribe();
+        subscription.Unsubscribe();
+        subscription.Unsubscribe();
+        
+        // Assert
+        Assert.True(subscription.IsDisposed);
+        Assert.Equal(0, messenger.CountSubscriptionsForMessage<DummyMessage>());
+    }
+    
+    [Fact]
     public void SubscribeWeakToMessenger()
     {
         // Arrange

@@ -38,7 +38,7 @@ public class InProcessMessengerTests
         
         var receivedCallCount = 0;
         var myAction = new Action<DummyMessage>(_ => receivedCallCount++);
-        using var registration = messenger.Subscribe<DummyMessage>(myAction);
+        using var registration = messenger.SubscribeWeak<DummyMessage>(myAction);
         
         // Act
         for (var loop = 0; loop < callCount; loop++)
