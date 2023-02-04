@@ -133,9 +133,9 @@ public sealed class MessageSubscription : IDisposable
                      (_weakTargetMethod != null))
             {
                 var targetObject = _weakTargetObject.Target;
-                if (targetObject == null)
+                if (targetObject != null)
                 {
-                    _weakTargetMethod.Invoke(_weakTargetObject, new object[] { message! });
+                    _weakTargetMethod.Invoke(targetObject, new object[] { message! });
                 }
                 else
                 {
