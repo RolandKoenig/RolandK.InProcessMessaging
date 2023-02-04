@@ -77,6 +77,22 @@ public class MessageSubscriptionTests
     }
     
     [Fact]
+    public void Subscribe_and_Unsubscribe_on_InProcessMessenger()
+    {
+        // Arrange
+        var messenger = new InProcessMessenger();
+        
+        // Act
+        var subscribedAction = (DummyMessage message) => { };
+        var subscription = messenger.Subscribe(subscribedAction);
+        messenger.Unsubscribe(subscription);
+        
+        // Assert
+        Assert.True(subscription.IsDisposed);
+        Assert.Equal(0, messenger.CountSubscriptionsForMessage<DummyMessage>());
+    }
+    
+    [Fact]
     public void Subscribe_and_Unsubscribe_multiple_times()
     {
         // Arrange
@@ -86,8 +102,26 @@ public class MessageSubscriptionTests
         var subscribedAction = (DummyMessage message) => { };
         using var subscription = messenger.Subscribe(subscribedAction);
         subscription.Unsubscribe();
+        subscription.Unsubscribe(); // Multiple unsubscribes should have no effect (also no exception)
         subscription.Unsubscribe();
-        subscription.Unsubscribe();
+        
+        // Assert
+        Assert.True(subscription.IsDisposed);
+        Assert.Equal(0, messenger.CountSubscriptionsForMessage<DummyMessage>());
+    }
+    
+    [Fact]
+    public void Subscribe_and_Dispose_multiple_times()
+    {
+        // Arrange
+        var messenger = new InProcessMessenger();
+        
+        // Act
+        var subscribedAction = (DummyMessage message) => { };
+        using var subscription = messenger.Subscribe(subscribedAction);
+        subscription.Dispose();
+        subscription.Dispose(); // Multiple unsubscribes should have no effect (also no exception)
+        subscription.Dispose();
         
         // Assert
         Assert.True(subscription.IsDisposed);
@@ -140,7 +174,7 @@ public class MessageSubscriptionTests
         var messenger = new InProcessMessenger();
         
         // Act
-        var subscriberObject = new DummyMessageSubscriber();
+        var subscriberObject = new DummyMessageSubscriberWithInterface();
         var subscriptions = messenger.SubscribeAll(subscriberObject);
         
         messenger.Publish<DummyMessage>();
@@ -180,11 +214,11 @@ public class MessageSubscriptionTests
         var messenger = new InProcessMessenger();
         
         // Act
-        var subscriptions = await Task.Run(new Func<IEnumerable<MessageSubscription>>(() =>
+        var subscriptions = await Task.Run(() =>
         {
             var subscriberObject = new DummyMessageSubscriber();
             return messenger.SubscribeAllWeak(subscriberObject);
-        }));
+        });
         
         GC.Collect();
         GC.Collect();
