@@ -2,9 +2,9 @@
 A messenger implementation which sends / receives in process messages. It is able to communicate between different areas of your application like threads, agents, etc.
 
 ## Feature overview
-- Messenger implementation for sending / receiving messages (publish/subscribe)
-- Waiting for specific messages
-- Separated interfaces for publish and subscribe
+- [Messenger implementation for sending / receiving messages (publish/subscribe)](#messenger-implementation-for-sending--receiving-messages)
+- [Waiting for specific messages](#waiting-for-specific-messages)
+- [Separated interfaces for publish and subscribe](#waiting-for-specific-messages)
 - Multiple messengers can communicate with each other using a routing mechanism
 - Thread synchronization using SynchronizationContext
 
