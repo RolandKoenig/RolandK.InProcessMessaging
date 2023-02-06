@@ -234,13 +234,23 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
     /// <summary>
     /// Waits for the given message.
     /// </summary>
-    public Task<T> WaitForMessageAsync<T>()
+    public Task<T> WaitForMessageAsync<T>(CancellationToken cancellationToken)
     {
         TaskCompletionSource<T> taskComplSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // Handle cancellation
+        CancellationTokenRegistration cancellationTokenRegistration = default;
+        if (cancellationToken.CanBeCanceled)
+        {
+            cancellationTokenRegistration = cancellationToken.Register(
+                () => taskComplSource.TrySetCanceled());
+        }
 
         MessageSubscription? subscription = null;
         subscription = this.Subscribe<T>((message) =>
         {
+            cancellationTokenRegistration.Dispose();
+
             // Unsubscribe first
             // ReSharper disable once AccessToModifiedClosure
             subscription!.Unsubscribe();
