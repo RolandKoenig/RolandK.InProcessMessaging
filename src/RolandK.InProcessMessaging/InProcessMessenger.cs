@@ -2,7 +2,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using RolandK.InProcessMessaging.Checking;
@@ -19,7 +18,8 @@ namespace RolandK.InProcessMessaging;
 /// </summary>
 public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageSubscriber
 {
-    public const string METHOD_NAME_MESSAGE_RECEIVED = "OnMessageReceived";
+    public const string METHOD_NAME_MESSAGE_RECEIVED = 
+        nameof(IInProcessMessageHandler<InProcessMessage>.OnMessageReceived);
 
     /// <summary>
     /// Gets or sets a custom exception handler which is used globally.
@@ -234,82 +234,32 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
     /// <summary>
     /// Waits for the given message.
     /// </summary>
-    public Task<T> WaitForMessageAsync<T>()
+    public Task<T> WaitForMessageAsync<T>(CancellationToken cancellationToken)
     {
         TaskCompletionSource<T> taskComplSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // Handle cancellation
+        CancellationTokenRegistration cancellationTokenRegistration = default;
+        if (cancellationToken.CanBeCanceled)
+        {
+            cancellationTokenRegistration = cancellationToken.Register(
+                () => taskComplSource.TrySetCanceled());
+        }
 
         MessageSubscription? subscription = null;
         subscription = this.Subscribe<T>((message) =>
         {
+            cancellationTokenRegistration.Dispose();
+
             // Unsubscribe first
             // ReSharper disable once AccessToModifiedClosure
             subscription!.Unsubscribe();
 
             // Set the task's result
-            taskComplSource.SetResult(message);
+            taskComplSource.TrySetResult(message);
         });
 
         return taskComplSource.Task;
-    }
-
-    /// <summary>
-    /// Subscribes all receiver-methods of the given target object to this Messenger.
-    /// The methods have to be called OnMessageReceived.
-    /// Example: void OnMessageReceived(TMessageType message)
-    /// </summary>
-    /// <param name="targetObject">The target object which is to subscribe.</param>
-    public IEnumerable<MessageSubscription> SubscribeAll(object targetObject)
-    {
-        targetObject.EnsureNotNull(nameof(targetObject));
-
-        var targetObjectType = targetObject.GetType();
-        var generatedSubscriptions = new List<MessageSubscription>(16);
-        try
-        {
-            foreach (var actMethod in targetObjectType.GetMethods(
-                         BindingFlags.NonPublic | BindingFlags.Public | 
-                         BindingFlags.Instance | BindingFlags.InvokeMethod))
-            {
-                if (!actMethod.Name.Equals(METHOD_NAME_MESSAGE_RECEIVED)) { continue; }
-
-                var parameters = actMethod.GetParameters();
-                if (parameters.Length != 1) { continue; }
-
-                if (!InProcessMessageMetadataHelper.ValidateMessageType(parameters[0].ParameterType, out _))
-                {
-                    continue;
-                }
-
-                var genericAction = typeof(Action<>);
-                var delegateType = genericAction.MakeGenericType(parameters[0].ParameterType);
-                generatedSubscriptions.Add(this.Subscribe(
-                    actMethod.CreateDelegate(delegateType, targetObject),
-                    parameters[0].ParameterType));
-            }
-        }
-        catch(Exception)
-        {
-            foreach(var actSubscription in generatedSubscriptions)
-            {
-                actSubscription.Unsubscribe();
-            }
-            generatedSubscriptions.Clear();
-        }
-
-        return generatedSubscriptions;
-    }
-
-    /// <summary>
-    /// Subscribes to the given MessageType.
-    /// </summary>
-    /// <typeparam name="TMessageType">Type of the message.</typeparam>
-    /// <param name="actionOnMessage">Action to perform on incoming message.</param>
-    public MessageSubscription Subscribe<TMessageType>(Action<TMessageType> actionOnMessage)
-    {
-        actionOnMessage.EnsureNotNull(nameof(actionOnMessage));
-
-        var currentType = typeof(TMessageType);
-        return this.Subscribe(actionOnMessage, currentType);
     }
 
     /// <summary>
@@ -342,6 +292,40 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
 
         return newOne;
     }
+    
+    /// <summary>
+    /// Subscribes to the given message type (using WeakReference).
+    /// </summary>
+    /// <param name="messageType">The type of the message.</param>
+    /// <param name="actionOnMessage">Action to perform on incoming message.</param>
+    public MessageSubscription SubscribeWeak(
+        Delegate actionOnMessage, Type messageType)
+    {
+        actionOnMessage.EnsureNotNull(nameof(actionOnMessage));
+        messageType.EnsureNotNull(nameof(messageType));
+
+        InProcessMessageMetadataHelper.EnsureValidMessageType(messageType);
+
+        var newOne = new MessageSubscription(
+            this, messageType, 
+            new WeakReference(actionOnMessage.Target), 
+            actionOnMessage.Method);
+        lock (_messageSubscriptionsLock)
+        {
+            if (_messageSubscriptions.ContainsKey(messageType))
+            {
+                _messageSubscriptions[messageType].Add(newOne);
+            }
+            else
+            {
+                List<MessageSubscription> newList = new();
+                newList.Add(newOne);
+                _messageSubscriptions[messageType] = newList;
+            }
+        }
+
+        return newOne;
+    }
 
     /// <summary>
     /// Clears the given MessageSubscription.
@@ -350,28 +334,30 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
     public void Unsubscribe(MessageSubscription messageSubscription)
     {
         messageSubscription.EnsureNotNull(nameof(messageSubscription));
+        if (messageSubscription.IsDisposed) { return; }
 
-        if (!messageSubscription.IsDisposed)
+        messageSubscription.Messenger.EnsureEqual(
+            this,
+            $"{nameof(messageSubscription)}.{nameof(messageSubscription.Messenger)}");
+
+        var messageType = messageSubscription.MessageType;
+
+        // Remove subscription from internal list
+        lock (_messageSubscriptionsLock)
         {
-            var messageType = messageSubscription.MessageType;
-
-            // Remove subscription from internal list
-            lock (_messageSubscriptionsLock)
+            if (_messageSubscriptions.ContainsKey(messageType))
             {
-                if (_messageSubscriptions.ContainsKey(messageType))
+                var listOfSubscriptions = _messageSubscriptions[messageType];
+                listOfSubscriptions.Remove(messageSubscription);
+                if (listOfSubscriptions.Count == 0)
                 {
-                    var listOfSubscriptions = _messageSubscriptions[messageType];
-                    listOfSubscriptions.Remove(messageSubscription);
-                    if (listOfSubscriptions.Count == 0)
-                    {
-                        _messageSubscriptions.Remove(messageType);
-                    }
+                    _messageSubscriptions.Remove(messageType);
                 }
             }
-
-            // Clear given subscription
-            messageSubscription.Clear();
         }
+
+        // Clear given subscription
+        messageSubscription.Clear();
     }
 
     /// <summary>
@@ -397,16 +383,6 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
     /// Sends the given message to all subscribers (async processing).
     /// There is no possibility here to wait for the answer.
     /// </summary>
-    public void BeginPublish<TMessageType>()
-        where TMessageType : new()
-    {
-        this.BeginPublish(new TMessageType());
-    }
-
-    /// <summary>
-    /// Sends the given message to all subscribers (async processing).
-    /// There is no possibility here to wait for the answer.
-    /// </summary>
     /// <typeparam name="TMessageType">The type of the message type.</typeparam>
     /// <param name="message">The message.</param>
     public void BeginPublish<TMessageType>(
@@ -420,33 +396,12 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
     /// The returned task waits for all synchronous subscriptions.
     /// </summary>
     /// <typeparam name="TMessageType">The type of the message.</typeparam>
-    public Task BeginPublishAsync<TMessageType>()
-        where TMessageType : new()
-    {
-        return _hostSyncContext.PostAlsoIfNullAsync(
-            this.Publish<TMessageType>);
-    }
-
-    /// <summary>
-    /// Sends the given message to all subscribers (async processing).
-    /// The returned task waits for all synchronous subscriptions.
-    /// </summary>
-    /// <typeparam name="TMessageType">The type of the message.</typeparam>
     /// <param name="message">The message to be sent.</param>
     public Task BeginPublishAsync<TMessageType>(
         TMessageType message)
     {
         return _hostSyncContext.PostAlsoIfNullAsync(
             () => this.Publish(message));
-    }
-
-    /// <summary>
-    /// Sends the given message to all subscribers (sync processing).
-    /// </summary>
-    public void Publish<TMessageType>()
-        where TMessageType : new()
-    {
-        this.Publish(new TMessageType());
     }
 
     /// <summary>

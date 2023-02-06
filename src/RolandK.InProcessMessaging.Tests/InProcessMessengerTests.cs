@@ -26,6 +26,33 @@ public class InProcessMessengerTests
         Assert.Equal(1, messenger.CountSubscriptions);
         Assert.Equal(1, messenger.CountSubscriptionsForMessage<DummyMessage>());
     }
+    
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(5)]
+    public void Publish_OneMessenger_Weak(int callCount)
+    {
+        // Arrange
+        var messenger = new InProcessMessenger();
+        
+        var receivedCallCount = 0;
+        var myAction = new Action<DummyMessage>(_ => receivedCallCount++);
+        using var registration = messenger.SubscribeWeak<DummyMessage>(myAction);
+        
+        // Act
+        for (var loop = 0; loop < callCount; loop++)
+        {
+            messenger.Publish(new DummyMessage());
+        }
+
+        // Assert
+        Assert.Equal(callCount, receivedCallCount);
+        Assert.Equal(1, messenger.CountSubscriptions);
+        Assert.Equal(1, messenger.CountSubscriptionsForMessage<DummyMessage>());
+
+        GC.KeepAlive(myAction);
+    }
 
     [Fact]
     public void PublishAfterDisposingSubscription_OneMessenger()
