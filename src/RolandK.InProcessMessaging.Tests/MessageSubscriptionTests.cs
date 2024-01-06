@@ -263,6 +263,32 @@ public class MessageSubscriptionTests
         // Assert
         await Assert.ThrowsAsync<TaskCanceledException>(() => messageWaiter);
     }
+    
+    [Fact]
+    public void SubscribeAll_and_UnsubscribeAll()
+    {
+        // Arrange
+        var messenger = new InProcessMessenger();
+        
+        // Act
+        var subscriberObject = new DummyMessageSubscriber();
+        var subscriptions = messenger.SubscribeAll(subscriberObject);
+        
+        messenger.Publish<DummyMessage>();
+        messenger.Publish<AnotherDummyMessage>();
+        messenger.Publish<AnotherDummyMessage>();
+        
+        subscriptions.UnsubscribeAll();
+        
+        messenger.Publish<DummyMessage>();
+        messenger.Publish<AnotherDummyMessage>();
+        messenger.Publish<AnotherDummyMessage>();
+        
+        // Assert
+        Assert.Equal(2, subscriptions.Count());
+        Assert.Equal(1, subscriberObject.CountDummyMessage);
+        Assert.Equal(2, subscriberObject.CountAnotherDummyMessage);
+    }
 
     //*************************************************************************
     //*************************************************************************

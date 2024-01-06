@@ -42,7 +42,7 @@ Now we can publish a message to notify all subscribers of that message type.
 ```csharp
 messenger.Publish(new DummyMessage());
 ```
-`
+
 ## Waiting for specific messages
 You can wait for specific messages using the WaitForMessageAsync method. This method subscribes to
 the specified message types. It returns the first message it receives and unsubscribes after that.
