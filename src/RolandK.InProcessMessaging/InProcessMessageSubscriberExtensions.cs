@@ -118,37 +118,47 @@ public static class InProcessMessageSubscriberExtensions
         var generatedSubscriptions = new List<MessageSubscription>(16);
         try
         {
-            foreach (var actMethod in targetObjectType.GetMethods(
-                         BindingFlags.NonPublic | BindingFlags.Public | 
-                         BindingFlags.Instance | BindingFlags.InvokeMethod))
+            do
             {
-                if (!actMethod.Name.Equals(InProcessMessenger.METHOD_NAME_MESSAGE_RECEIVED)) { continue; }
-
-                var parameters = actMethod.GetParameters();
-                if (parameters.Length != 1) { continue; }
-
-                if (!InProcessMessageMetadataHelper.ValidateMessageType(parameters[0].ParameterType, out _))
+                var methods = targetObjectType.GetMethods(
+                    BindingFlags.NonPublic |
+                    BindingFlags.Public |
+                    BindingFlags.Instance |
+                    BindingFlags.InvokeMethod);
+                foreach (var actMethod in methods)
                 {
-                    continue;
+                    if (!actMethod.Name.Equals(InProcessMessenger.METHOD_NAME_MESSAGE_RECEIVED)) { continue; }
+
+                    var parameters = actMethod.GetParameters();
+                    if (parameters.Length != 1) { continue; }
+
+                    if (!InProcessMessageMetadataHelper.ValidateMessageType(parameters[0].ParameterType, out _))
+                    {
+                        continue;
+                    }
+
+                    var genericAction = typeof(Action<>);
+                    var delegateType = genericAction.MakeGenericType(parameters[0].ParameterType);
+                    var targetDelegate = actMethod.CreateDelegate(delegateType, targetObject);
+
+                    if (useWeakReferences)
+                    {
+                        generatedSubscriptions.Add(subscriber.SubscribeWeak(
+                            targetDelegate,
+                            parameters[0].ParameterType));
+                    }
+                    else
+                    {
+                        generatedSubscriptions.Add(subscriber.Subscribe(
+                            targetDelegate,
+                            parameters[0].ParameterType));
+                    }
                 }
 
-                var genericAction = typeof(Action<>);
-                var delegateType = genericAction.MakeGenericType(parameters[0].ParameterType);
-                var targetDelegate = actMethod.CreateDelegate(delegateType, targetObject);
-
-                if (useWeakReferences)
-                {
-                    generatedSubscriptions.Add(subscriber.SubscribeWeak(
-                        targetDelegate,
-                        parameters[0].ParameterType));
-                }
-                else
-                {
-                    generatedSubscriptions.Add(subscriber.Subscribe(
-                        targetDelegate,
-                        parameters[0].ParameterType));
-                }
-            }
+                targetObjectType = targetObjectType.BaseType;
+            } 
+            while ((targetObjectType != null) &&
+                   (targetObjectType != typeof(object)));
         }
         catch(Exception)
         {

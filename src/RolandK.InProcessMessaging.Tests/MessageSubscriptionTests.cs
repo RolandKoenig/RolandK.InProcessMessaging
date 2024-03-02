@@ -208,6 +208,29 @@ public class MessageSubscriptionTests
     }
     
     [Fact]
+    public void SubscribeAllWeakOnDerivedClass_and_Publish()
+    {
+        // Arrange
+        var messenger = new InProcessMessenger();
+        
+        // Act
+        var subscriberObject = new DummyDerivedMessageSubscriber();
+        var subscriptions = messenger.SubscribeAllWeak(subscriberObject);
+        
+        messenger.Publish<DummyMessage>();
+        messenger.Publish<AnotherDummyMessage>();
+        messenger.Publish<AnotherDummyMessage>();
+        messenger.Publish<ThirdDummyMessage>();
+        
+        // Assert
+        Assert.Equal(4, subscriptions.Count());
+        Assert.Equal(1, subscriberObject.CountDummyMessage);
+        Assert.Equal(2, subscriberObject.CountAnotherDummyMessage);
+        Assert.Equal(1, subscriberObject.CountDummyMessageOnDerivedClass);
+        Assert.Equal(1, subscriberObject.CountDummyMessage2);
+    }
+    
+    [Fact]
     public async Task SubscribeAllWeak_then_collect_subscriber()
     {
         // Arrange
@@ -241,6 +264,9 @@ public class MessageSubscriptionTests
     [InProcessMessage]
     private record AnotherDummyMessage;
 
+    [InProcessMessage]
+    private record ThirdDummyMessage;
+
     private class DummyMessageSubscriber
     {
         public int CountDummyMessage { get; set; }
@@ -255,6 +281,23 @@ public class MessageSubscriptionTests
         private void OnMessageReceived(AnotherDummyMessage message)
         {
             this.CountAnotherDummyMessage++;
+        }
+    }
+
+    private class DummyDerivedMessageSubscriber : DummyMessageSubscriber
+    {
+        public int CountDummyMessageOnDerivedClass { get; set; }
+        
+        public int CountDummyMessage2 { get; set; }
+        
+        private void OnMessageReceived(ThirdDummyMessage message)
+        {
+            this.CountDummyMessageOnDerivedClass++;
+        }
+        
+        private void OnMessageReceived(DummyMessage message)
+        {
+            this.CountDummyMessage2++;
         }
     }
     
