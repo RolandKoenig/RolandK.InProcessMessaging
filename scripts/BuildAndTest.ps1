@@ -1,2 +1,2 @@
-dotnet build -c Release "../src/RolandK.InProcessMessaging.sln"
-dotnet test -c Release "../src/RolandK.InProcessMessaging.sln"
+dotnet build -c Release "../RolandK.InProcessMessaging.sln"
+dotnet test -c Release "../RolandK.InProcessMessaging.sln"

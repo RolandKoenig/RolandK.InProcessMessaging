@@ -255,6 +255,64 @@ public class MessageSubscriptionTests
         Assert.Equal(2, subscriptions.Count(x => x.IsDisposed));
     }
     
+    [Fact]
+    public void WaitForMessage_with_Publish()
+    {
+        // Arrange
+        var messenger = new InProcessMessenger();
+
+        // Act
+        var messageWaiter = messenger.WaitForMessageAsync<DummyMessage>(CancellationToken.None);
+
+        var message = new DummyMessage();
+        messenger.Publish(message);
+
+        // Assert
+        Assert.Equal(TaskStatus.RanToCompletion, messageWaiter.Status);
+        Assert.Equal(message, messageWaiter.Result);
+        Assert.Equal(0, messenger.CountSubscriptionsForMessage<DummyMessage>());
+    }
+
+    [Fact]
+    public async Task WaitForMessage_without_Publish_then_timeout()
+    {
+        // Arrange
+        var messenger = new InProcessMessenger();
+
+        // Act
+        var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(10));
+        var messageWaiter = messenger.WaitForMessageAsync<DummyMessage>(cancellationTokenSource.Token);
+
+        // Assert
+        await Assert.ThrowsAsync<TaskCanceledException>(() => messageWaiter);
+    }
+    
+    [Fact]
+    public void SubscribeAll_and_UnsubscribeAll()
+    {
+        // Arrange
+        var messenger = new InProcessMessenger();
+        
+        // Act
+        var subscriberObject = new DummyMessageSubscriber();
+        var subscriptions = messenger.SubscribeAll(subscriberObject);
+        
+        messenger.Publish<DummyMessage>();
+        messenger.Publish<AnotherDummyMessage>();
+        messenger.Publish<AnotherDummyMessage>();
+        
+        subscriptions.UnsubscribeAll();
+        
+        messenger.Publish<DummyMessage>();
+        messenger.Publish<AnotherDummyMessage>();
+        messenger.Publish<AnotherDummyMessage>();
+        
+        // Assert
+        Assert.Equal(2, subscriptions.Count());
+        Assert.Equal(1, subscriberObject.CountDummyMessage);
+        Assert.Equal(2, subscriberObject.CountAnotherDummyMessage);
+    }
+    
     //*************************************************************************
     //*************************************************************************
     //*************************************************************************

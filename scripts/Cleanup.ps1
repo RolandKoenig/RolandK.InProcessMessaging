@@ -1,5 +1,5 @@
 # Cleanup solution
-dotnet clean "../src/RolandK.InProcessMessaging.sln"
+dotnet clean "../RolandK.InProcessMessaging.sln"
 
 # Delete all bin and obj directories
 $directories = Get-ChildItem "../src/" -include bin,obj -Recurse

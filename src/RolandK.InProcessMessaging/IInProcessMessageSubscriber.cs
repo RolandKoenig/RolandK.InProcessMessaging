@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace RolandK.InProcessMessaging;
 
@@ -25,7 +26,7 @@ public interface IInProcessMessageSubscriber
     /// <summary>
     /// Waits for the given message.
     /// </summary>
-    Task<T> WaitForMessageAsync<T>();
+    Task<T> WaitForMessageAsync<T>(CancellationToken cancellationToken);
 
     /// <summary>
     /// Clears the given MessageSubscription.

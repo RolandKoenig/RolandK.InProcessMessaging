@@ -234,13 +234,23 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
     /// <summary>
     /// Waits for the given message.
     /// </summary>
-    public Task<T> WaitForMessageAsync<T>()
+    public Task<T> WaitForMessageAsync<T>(CancellationToken cancellationToken)
     {
         TaskCompletionSource<T> taskComplSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // Handle cancellation
+        CancellationTokenRegistration cancellationTokenRegistration = default;
+        if (cancellationToken.CanBeCanceled)
+        {
+            cancellationTokenRegistration = cancellationToken.Register(
+                () => taskComplSource.TrySetCanceled());
+        }
 
         MessageSubscription? subscription = null;
         subscription = this.Subscribe<T>((message) =>
         {
+            cancellationTokenRegistration.Dispose();
+
             // Unsubscribe first
             // ReSharper disable once AccessToModifiedClosure
             subscription!.Unsubscribe();
@@ -373,16 +383,6 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
     /// Sends the given message to all subscribers (async processing).
     /// There is no possibility here to wait for the answer.
     /// </summary>
-    public void BeginPublish<TMessageType>()
-        where TMessageType : new()
-    {
-        this.BeginPublish(new TMessageType());
-    }
-
-    /// <summary>
-    /// Sends the given message to all subscribers (async processing).
-    /// There is no possibility here to wait for the answer.
-    /// </summary>
     /// <typeparam name="TMessageType">The type of the message type.</typeparam>
     /// <param name="message">The message.</param>
     public void BeginPublish<TMessageType>(
@@ -396,33 +396,12 @@ public class InProcessMessenger : IInProcessMessagePublisher, IInProcessMessageS
     /// The returned task waits for all synchronous subscriptions.
     /// </summary>
     /// <typeparam name="TMessageType">The type of the message.</typeparam>
-    public Task BeginPublishAsync<TMessageType>()
-        where TMessageType : new()
-    {
-        return _hostSyncContext.PostAlsoIfNullAsync(
-            this.Publish<TMessageType>);
-    }
-
-    /// <summary>
-    /// Sends the given message to all subscribers (async processing).
-    /// The returned task waits for all synchronous subscriptions.
-    /// </summary>
-    /// <typeparam name="TMessageType">The type of the message.</typeparam>
     /// <param name="message">The message to be sent.</param>
     public Task BeginPublishAsync<TMessageType>(
         TMessageType message)
     {
         return _hostSyncContext.PostAlsoIfNullAsync(
             () => this.Publish(message));
-    }
-
-    /// <summary>
-    /// Sends the given message to all subscribers (sync processing).
-    /// </summary>
-    public void Publish<TMessageType>()
-        where TMessageType : new()
-    {
-        this.Publish(new TMessageType());
     }
 
     /// <summary>

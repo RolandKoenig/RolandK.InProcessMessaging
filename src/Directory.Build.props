@@ -2,8 +2,8 @@
 
     <!-- Version -->
     <PropertyGroup>
-        <Version>1.0.1-preview1</Version>
-        <PackageVersion>1.0.1-preview1</PackageVersion>
+        <Version>1.0.2</Version>
+        <PackageVersion>1.0.2</PackageVersion>
     </PropertyGroup>
 
     <!-- Nuget -->
@@ -31,7 +31,7 @@
         <PackageIcon>Logo_128.png</PackageIcon>
     </PropertyGroup>
     <ItemGroup>
-        <None Include="$(SolutionDir)../assets/Logo_128.png" Pack="true" PackagePath="\" />
+        <None Include="$(SolutionDir)assets/Logo_128.png" Pack="true" PackagePath="\" />
     </ItemGroup>
     
     <!-- Commn configuration-->
