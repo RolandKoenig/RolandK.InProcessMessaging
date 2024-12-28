@@ -256,7 +256,7 @@ public class MessageSubscriptionTests
     }
     
     [Fact]
-    public void WaitForMessage_with_Publish()
+    public async Task WaitForMessage_with_Publish()
     {
         // Arrange
         var messenger = new InProcessMessenger();
@@ -268,8 +268,9 @@ public class MessageSubscriptionTests
         messenger.Publish(message);
 
         // Assert
+        var waiterResult = await messageWaiter;
         Assert.Equal(TaskStatus.RanToCompletion, messageWaiter.Status);
-        Assert.Equal(message, messageWaiter.Result);
+        Assert.Equal(message, waiterResult);
         Assert.Equal(0, messenger.CountSubscriptionsForMessage<DummyMessage>());
     }
 
